@@ -1,86 +1,42 @@
-/* --------------------- DESNORMALIZACIÓN DE MENSAJES ---------------------------- */
-// Definimos un esquema de autor
-const schemaAuthor = new normalizr.schema.Entity('author',{},{idAttribute: 'id'});
+//Este archivo js lo utilizo junto con la lógica del socket.io
+//Socket.io es una biblioteca de JavaScript que se utiliza para desarrollar aplicaciones web en tiempo real
+//Su principal función es permitir la comunicación bidireccional en tiempo real entre el servidor y el cliente a través de WebSocket, una tecnología que habilita conexiones persistentes y de baja latencia
 
-// Definimos un esquema de mensaje
-const schemaMensaje = new normalizr.schema.Entity('post', {
-    author: schemaAuthor
-},{idAttribute: '_id'})
 
-// Definimos un esquema de posts
-const schemaMensajes = new normalizr.schema.Entity('posts', {
-  mensajes: [schemaMensaje]
-},{idAttribute: 'id'})
-/* ----------------------------------------------------------------------------- */
 
-/* ----------------------------------------------------------------- */
-socket.on('messages', function(mensajesN) { 
+const socket = io.connect('http://localhost:4000')
+const botonChat = document.getElementById("botonChat");
+const parrafosMensajes = document.getElementById("parrafosMensajes");
+const valueInput = document.getElementById("chatBox");
+let userEmail;
 
-  let mensajesNsize = JSON.stringify(mensajesN).length
-  console.log(mensajesN, mensajesNsize);
 
-  let mensajesD = normalizr.denormalize(mensajesN.result, schemaMensajes,mensajesN.entities)
 
-  let mensajesDsize = JSON.stringify(mensajesD).length
-  console.log(mensajesD, mensajesDsize);
-
-  let porcentajeC = parseInt((mensajesNsize * 100) / mensajesDsize)
-  console.log(`Porcentaje de compresión ${porcentajeC}%`)
-  document.getElementById('compresion-info').innerText = porcentajeC
-
-  render(mensajesD.mensajes);
+Swal.fire({
+    title: "Ingrese un usuario",
+    text: "Por favor ingrese su usuario",
+    input: "text",
+    inputValidator: (valor) => {
+        return !valor && "Ingrese un usuario correctamente";
+    },
+    allowOutsideClick: false,
+}).then((resultado) => {
+    userEmail = resultado.value;
+    socket.emit("load-chat"); //Evento personalizado load-chat creado en app.js
 });
 
-function render(data) { 
-    var html = data.map(function(elem, index){ 
-      return(`
-            <div>
-                <b style="color:blue;">${elem.author.email}</b> 
-                [<span style="color:brown;">${elem.fyh}</span>] : 
-                <i style="color:green;">${elem.text}</i>
-                <img width="50" src="${elem.author.avatar}" alt=" ">
-            </div>
-        `) 
-    }).join(" "); 
-    document.getElementById('messages').innerHTML = html; 
-}
+botonChat.addEventListener('click', () => {
+    let fechaActual = new Date().toLocaleString()
 
-const userCentroMensajes = document.getElementById('username')
-const textoCentroMensajes = document.getElementById('texto')
-const botonCentroMensajes = document.getElementById('enviar')
-
-function addMessage(e) { 
-
-  e.preventDefault()
-
-  var mensaje = { 
-    author: {
-        email: userCentroMensajes.value, 
-        nombre: document.getElementById('firstname').value, 
-        apellido: document.getElementById('lastname').value, 
-        edad: document.getElementById('age').value, 
-        alias: document.getElementById('alias').value,
-        avatar: document.getElementById('avatar').value
-    },
-    text: textoCentroMensajes.value
-  }
-
-  socket.emit('new-message', mensaje); 
-
-  textoCentroMensajes.value = ''
-  textoCentroMensajes.focus()
-
-  botonCentroMensajes.disabled = true
-}
-
-userCentroMensajes.addEventListener('input', () => {
-    let hayEmail = userCentroMensajes.value.length
-    let hayTexto = textoCentroMensajes.value.length
-    textoCentroMensajes.disabled = !hayEmail
-    botonCentroMensajes.disabled = !hayEmail || !hayTexto
+    if (valueInput.value.trim().length > 0) {
+        socket.emit('add-message', { fecha: fechaActual, email: userEmail, mensaje: valueInput.value }) //Evento personalizado add-message creado en app.js
+        valueInput.value = ""
+    }
 })
 
-textoCentroMensajes.addEventListener('input', () => {
-    let hayTexto = textoCentroMensajes.value.length
-    botonCentroMensajes.disabled = !hayTexto
-})
+socket.on("show-messages", (arrayMensajes) => { //Evento personalizado show-messages creado en app.js
+    parrafosMensajes.innerHTML = "";
+    arrayMensajes.forEach(mensaje => {
+        parrafosMensajes.innerHTML += `<p>${mensaje.postTime}: el usuario ${mensaje.email} escribió ${mensaje.message} </p>`;
+    });
+});
